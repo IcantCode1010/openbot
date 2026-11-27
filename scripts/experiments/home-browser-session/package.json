@@ -1,0 +1,2 @@
+{"name":"openbot-home-browser-smoke","private":true,"version":"0.0.1","main":"main.cjs","devDependencies":{"electron":"45.3.0"},"scripts":{"start":"electron .","test":"node --test launch.test.mjs"}}
+
