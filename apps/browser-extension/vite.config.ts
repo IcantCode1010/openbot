@@ -28,13 +28,12 @@ function extensionManifest(apiUrl: string, webUrl: string, development: boolean,
     name: "openbot-extension-manifest",
     generateBundle() {
       const hostPermissions = [`${new URL(apiUrl).origin}/*`];
-      if (chromePilot) hostPermissions.push("https://en.wikipedia.org/*");
       if (development && !chromePilot) hostPermissions.push("http://localhost/*", "http://127.0.0.1/*");
       const manifest = {
         manifest_version: 3,
         name: chromePilot ? "OpenBot (Chrome Pilot)" : development ? "OpenBot (Dev)" : "OpenBot",
         description: chromePilot
-          ? "OpenBot pilot for reading public English Wikipedia articles."
+          ? "OpenBot pilot for reading web pages on sites you allow."
           : "Chat with your OpenBot agents beside any page.",
         version: rootPackage.version,
         icons: { 16: "icons/icon-16.png", 32: "icons/icon-32.png", 48: "icons/icon-48.png", 128: "icons/icon-128.png" },
@@ -52,6 +51,7 @@ function extensionManifest(apiUrl: string, webUrl: string, development: boolean,
           "downloads",
         ],
         host_permissions: hostPermissions,
+        ...(chromePilot ? { optional_host_permissions: ["https://*/*", "http://*/*"] } : {}),
         externally_connectable: {
           matches: [
             `${new URL(webUrl).origin}/*`,

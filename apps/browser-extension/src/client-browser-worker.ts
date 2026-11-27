@@ -8,7 +8,7 @@ import {
   type ClientTab,
 } from "@openbot/contracts/team-protocol/client-browser-v1";
 import { track } from "./analytics";
-import { pilotTab, runPilot } from "./chrome-article-pilot";
+import { pilotTab, runPilot, sitePattern } from "./chrome-page-pilot";
 import { BrowserCommandError, clientTab, installExecutor, isWebUrl, runCommand } from "./client-browser-executor";
 import {
   ASKS_KEY,
@@ -95,7 +95,10 @@ async function sharedGroupId(): Promise<number | null> {
 async function presence(): Promise<ClientBrowserPresence> {
   const [current] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   const rank = (tab: chrome.tabs.Tab) => (tab.id === current?.id ? Number.MAX_SAFE_INTEGER : (tab.lastAccessed ?? 0));
-  const tabs = (await chrome.tabs.query({})).filter((tab) => isWebUrl(tab.url));
+  const sites = __OPENBOT_CHROME_PILOT__ ? await approvedSites() : null;
+  const tabs = (await chrome.tabs.query({})).filter(
+    (tab) => isWebUrl(tab.url) && (!sites || sites.includes(siteOf(tab.url) ?? "")),
+  );
   return {
     sharing: true,
     tabs: tabs
@@ -210,7 +213,9 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       throw new BrowserCommandError("failed", "Agents can use only web pages (http and https).");
     const site = new URL(url).origin;
     guardSite(site, event, labels);
-    if (kind === "site" && (await approvedSites()).includes(site)) return;
+    const pattern = __OPENBOT_CHROME_PILOT__ && kind === "site" ? sitePattern(site) : null;
+    const permitted = () => !pattern || chrome.permissions.contains({ origins: [pattern] });
+    if (kind === "site" && (await approvedSites()).includes(site) && (await permitted())) return;
     const deadline = deadlines.get(event.id) ?? Number.POSITIVE_INFINITY;
     if (Date.now() >= deadline) throw new BrowserCommandError("timeout", LATE);
     const choice = await ask(
@@ -231,10 +236,12 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
     if (choice === "timeout")
       throw new BrowserCommandError("timeout", "The person did not answer in time. Ask the person in the chat first.");
     if (choice === "deny") throw new BrowserCommandError("denied", "The person denied it.");
+    if (!(await permitted())) throw new BrowserCommandError("denied", "Chrome did not grant access to this site.");
     if (choice === "always" && kind === "site") {
       const stored = (await chrome.storage.local.get(SITES_KEY))[SITES_KEY];
       const sites = isDynamicRecord(stored) ? stored : {};
       await chrome.storage.local.set({ [SITES_KEY]: { ...sites, [site]: "always" } });
+      if (__OPENBOT_CHROME_PILOT__) changed();
     }
   }
 
@@ -285,6 +292,9 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       if (__OPENBOT_CHROME_PILOT__) {
         const result = await runPilot(event.command, {
           allow: (kind, url, detail) => allow(event, labels, kind, url, detail),
+          checkDeadline: () => {
+            if (Date.now() >= (deadlines.get(event.id) ?? 0)) throw new BrowserCommandError("timeout", LATE);
+          },
         });
         return { id: event.id, ok: true, result };
       }

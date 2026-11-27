@@ -91,6 +91,7 @@ declare namespace chrome {
       windowId: number;
       groupId: number;
       status?: string;
+      pendingUrl?: string;
       lastAccessed?: number;
     }
     function create(properties: {
@@ -189,4 +190,10 @@ declare namespace chrome.scripting {
     func: (...args: Args) => T;
     args: Args;
   }): Promise<Array<{ result?: T }>>;
+}
+
+declare namespace chrome.permissions {
+  function request(permissions: { origins: string[] }): Promise<boolean>;
+  function contains(permissions: { origins: string[] }): Promise<boolean>;
+  function remove(permissions: { origins: string[] }): Promise<boolean>;
 }

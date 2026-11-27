@@ -2,6 +2,7 @@ import { Button, CreditCard, Download, Globe2, KeyRound, LogIn } from "@openbot/
 import { useText } from "@openbot/ui/text";
 import { createSignal, For, Match, onSettled, Show, Switch } from "solid-js";
 import { track } from "./analytics";
+import { sitePattern } from "./chrome-page-pilot";
 import {
   ASKS_KEY,
   type AskChoice,
@@ -40,6 +41,10 @@ export async function removeAllowedSite(site: string): Promise<void> {
   const stored = (await chrome.storage.local.get(SITES_KEY))[SITES_KEY];
   const kept = Object.fromEntries(decodeSites(stored).flatMap((entry) => (entry === site ? [] : [[entry, "always"]])));
   await chrome.storage.local.set({ [SITES_KEY]: kept });
+  if (__OPENBOT_CHROME_PILOT__) {
+    const pattern = sitePattern(site);
+    if (pattern) await chrome.permissions.remove({ origins: [pattern] }).catch(() => false);
+  }
   void track("browser_sharing_action", { action: "site_removed" });
 }
 
@@ -145,7 +150,18 @@ export function BrowserAsks() {
   const shown = () => asks().filter((ask) => !answered().has(ask.id));
   function answer(ask: BrowserAsk, choice: AskChoice) {
     setAnswered((current) => new Set([...current, ask.id]));
-    void chrome.runtime.sendMessage({ kind: BROWSER_ANSWER_MESSAGE, id: ask.id, choice }).catch(() => undefined);
+    const send = (choice: AskChoice) =>
+      void chrome.runtime.sendMessage({ kind: BROWSER_ANSWER_MESSAGE, id: ask.id, choice }).catch(() => undefined);
+    if (__OPENBOT_CHROME_PILOT__ && ask.kind === "site" && choice !== "deny") {
+      const pattern = sitePattern(ask.site);
+      if (!pattern) return send("deny");
+      void chrome.permissions.request({ origins: [pattern] }).then(
+        (granted) => send(granted ? choice : "deny"),
+        () => send("deny"),
+      );
+      return;
+    }
+    send(choice);
   }
   return (
     <Show when={shown().length > 0}>
