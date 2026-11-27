@@ -22,8 +22,9 @@ const update = vi.fn(async (_id: number, { url: next }: { url: string }) => {
 const executeScript = vi.fn(async () => [
   {
     result: {
-      url,
+      kind: "snapshot",
       text: "Page facts",
+      controls: [],
       links: [
         { label: "Wiki", url: wiki },
         { label: "Guide", url: another },
@@ -135,7 +136,10 @@ test("does not read a tab that changed during approval", async () => {
 });
 
 test("discards results if navigation begins after the read is sent", async () => {
-  executeScript.mockImplementationOnce(async () => [{ result: { url: wiki, text: "private", links: [] } }]);
+  executeScript.mockImplementationOnce(async () => {
+    url = wiki;
+    return [];
+  });
   await expect(runPilot({ kind: "snapshot", tabId: "42" }, { allow })).rejects.toMatchObject({ code: "denied" });
 });
 

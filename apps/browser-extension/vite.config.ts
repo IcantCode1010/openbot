@@ -33,7 +33,7 @@ function extensionManifest(apiUrl: string, webUrl: string, development: boolean,
         manifest_version: 3,
         name: chromePilot ? "OpenBot (Chrome Pilot)" : development ? "OpenBot (Dev)" : "OpenBot",
         description: chromePilot
-          ? "OpenBot pilot for reading web pages on sites you allow."
+          ? "OpenBot pilot for using web pages on sites you allow."
           : "Chat with your OpenBot agents beside any page.",
         version: rootPackage.version,
         icons: { 16: "icons/icon-16.png", 32: "icons/icon-32.png", 48: "icons/icon-48.png", 128: "icons/icon-128.png" },

@@ -213,7 +213,7 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       throw new BrowserCommandError("failed", "Agents can use only web pages (http and https).");
     const site = new URL(url).origin;
     guardSite(site, event, labels);
-    const pattern = __OPENBOT_CHROME_PILOT__ && kind === "site" ? sitePattern(site) : null;
+    const pattern = __OPENBOT_CHROME_PILOT__ && (kind === "site" || kind === "interaction") ? sitePattern(site) : null;
     const permitted = () => !pattern || chrome.permissions.contains({ origins: [pattern] });
     if (kind === "site" && (await approvedSites()).includes(site) && (await permitted())) return;
     const deadline = deadlines.get(event.id) ?? Number.POSITIVE_INFINITY;
@@ -235,7 +235,8 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       throw new BrowserCommandError("timeout", LATE);
     if (choice === "timeout")
       throw new BrowserCommandError("timeout", "The person did not answer in time. Ask the person in the chat first.");
-    if (choice === "deny") throw new BrowserCommandError("denied", "The person denied it.");
+    if (choice === "deny" || (kind === "interaction" && choice !== "once"))
+      throw new BrowserCommandError("denied", "The person denied it.");
     if (!(await permitted())) throw new BrowserCommandError("denied", "Chrome did not grant access to this site.");
     if (choice === "always" && kind === "site") {
       const stored = (await chrome.storage.local.get(SITES_KEY))[SITES_KEY];
@@ -292,6 +293,7 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       if (__OPENBOT_CHROME_PILOT__) {
         const result = await runPilot(event.command, {
           allow: (kind, url, detail) => allow(event, labels, kind, url, detail),
+          deadline: deadlines.get(event.id) ?? 0,
           checkDeadline: () => {
             if (Date.now() >= (deadlines.get(event.id) ?? 0)) throw new BrowserCommandError("timeout", LATE);
           },

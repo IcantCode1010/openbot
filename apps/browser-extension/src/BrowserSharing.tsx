@@ -80,6 +80,7 @@ function actionWords(ask: BrowserAsk, t: ReturnType<typeof useText>["t"]): strin
 function askTitle(ask: BrowserAsk, t: ReturnType<typeof useText>["t"]): string {
   const values = { agent: ask.agentName, site: siteName(ask.site) };
   switch (ask.kind) {
+    case "interaction":
     case "site":
       return t("extension.browser.ask.site", values);
     case "password":
