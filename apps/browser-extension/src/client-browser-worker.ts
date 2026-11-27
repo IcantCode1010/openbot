@@ -8,6 +8,7 @@ import {
   type ClientTab,
 } from "@openbot/contracts/team-protocol/client-browser-v1";
 import { track } from "./analytics";
+import { pilotTab, runPilot } from "./chrome-article-pilot";
 import { BrowserCommandError, clientTab, installExecutor, isWebUrl, runCommand } from "./client-browser-executor";
 import {
   ASKS_KEY,
@@ -99,7 +100,7 @@ async function presence(): Promise<ClientBrowserPresence> {
     sharing: true,
     tabs: tabs
       .sort((left, right) => rank(right) - rank(left))
-      .flatMap((tab) => clientTab(tab) ?? [])
+      .flatMap((tab) => (__OPENBOT_CHROME_PILOT__ ? pilotTab(tab) : clientTab(tab)) ?? [])
       .slice(0, CLIENT_BROWSER_LIMITS.tabs),
   };
 }
@@ -130,7 +131,7 @@ async function writeAsks(asks: BrowserAsk[]): Promise<void> {
 }
 
 export function startClientBrowser(options: Options): ClientBrowserWorker {
-  installExecutor();
+  if (!__OPENBOT_CHROME_PILOT__) installExecutor();
   const waiting = new Map<string, (choice: AskChoice | "timeout") => void>();
   let queue: Promise<unknown> = Promise.resolve();
   let changeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -281,6 +282,12 @@ export function startClientBrowser(options: Options): ClientBrowserWorker {
       error: error.slice(0, CLIENT_BROWSER_LIMITS.error),
     });
     try {
+      if (__OPENBOT_CHROME_PILOT__) {
+        const result = await runPilot(event.command, {
+          allow: (kind, url, detail) => allow(event, labels, kind, url, detail),
+        });
+        return { id: event.id, ok: true, result };
+      }
       const result = await runCommand(event.command, {
         groupId: await sharedGroupId(),
         allow: (kind, url, detail) => allow(event, labels, kind, url, detail),

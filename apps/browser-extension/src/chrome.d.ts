@@ -183,3 +183,10 @@ declare namespace chrome {
     }): Promise<string | undefined>;
   }
 }
+declare namespace chrome.scripting {
+  function executeScript<T, Args extends unknown[]>(options: {
+    target: { tabId: number };
+    func: (...args: Args) => T;
+    args: Args;
+  }): Promise<Array<{ result?: T }>>;
+}

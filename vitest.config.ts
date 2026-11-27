@@ -31,6 +31,7 @@ export default defineConfig({
             "scripts/**/*.test.ts",
             "packages/logging/**/*.test.ts",
             "apps/mobile/src/**/*.test.ts",
+            "apps/browser-extension/src/**/*.test.ts",
           ],
           exclude: [...configDefaults.exclude, "**/*.dom.test.ts"],
         },

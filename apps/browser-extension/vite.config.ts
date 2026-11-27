@@ -23,16 +23,19 @@ function analyticsUrl(apiUrl: string, development: boolean): string {
 
 const X_CONTENT_SCRIPT = "x-content.js";
 
-function extensionManifest(apiUrl: string, webUrl: string, development: boolean): Plugin {
+function extensionManifest(apiUrl: string, webUrl: string, development: boolean, chromePilot: boolean): Plugin {
   return {
     name: "openbot-extension-manifest",
     generateBundle() {
       const hostPermissions = [`${new URL(apiUrl).origin}/*`];
-      if (development) hostPermissions.push("http://localhost/*", "http://127.0.0.1/*");
+      if (chromePilot) hostPermissions.push("https://en.wikipedia.org/*");
+      if (development && !chromePilot) hostPermissions.push("http://localhost/*", "http://127.0.0.1/*");
       const manifest = {
         manifest_version: 3,
-        name: development ? "OpenBot (Dev)" : "OpenBot",
-        description: "Chat with your OpenBot agents beside any page.",
+        name: chromePilot ? "OpenBot (Chrome Pilot)" : development ? "OpenBot (Dev)" : "OpenBot",
+        description: chromePilot
+          ? "OpenBot pilot for reading public English Wikipedia articles."
+          : "Chat with your OpenBot agents beside any page.",
         version: rootPackage.version,
         icons: { 16: "icons/icon-16.png", 32: "icons/icon-32.png", 48: "icons/icon-48.png", 128: "icons/icon-128.png" },
         action: { default_title: "OpenBot", default_icon: { 16: "icons/icon-16.png", 32: "icons/icon-32.png" } },
@@ -45,30 +48,30 @@ function extensionManifest(apiUrl: string, webUrl: string, development: boolean)
           "offscreen",
           "alarms",
           "notifications",
-          "tabs",
-          "tabGroups",
-          "debugger",
+          ...(chromePilot ? ["scripting"] : ["tabs", "tabGroups", "debugger"]),
           "downloads",
         ],
         host_permissions: hostPermissions,
         externally_connectable: {
           matches: [
             `${new URL(webUrl).origin}/*`,
-            ...(development ? ["http://localhost/*", "http://127.0.0.1/*"] : []),
+            ...(development && !chromePilot ? ["http://localhost/*", "http://127.0.0.1/*"] : []),
           ],
         },
-        content_scripts: [
-          {
-            matches: [
-              "https://x.com/*",
-              "https://twitter.com/*",
-              ...(development ? ["http://127.0.0.1/x-fixture/*"] : []),
+        content_scripts: chromePilot
+          ? []
+          : [
+              {
+                matches: [
+                  "https://x.com/*",
+                  "https://twitter.com/*",
+                  ...(development ? ["http://127.0.0.1/x-fixture/*"] : []),
+                ],
+                js: [X_CONTENT_SCRIPT],
+                css: ["x-content.css"],
+                run_at: "document_idle",
+              },
             ],
-            js: [X_CONTENT_SCRIPT],
-            css: ["x-content.css"],
-            run_at: "document_idle",
-          },
-        ],
       };
       this.emitFile({ type: "asset", fileName: "manifest.json", source: `${JSON.stringify(manifest, null, 2)}\n` });
     },
@@ -97,12 +100,14 @@ function xContentScript(development: boolean): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
-  const development = mode === "development";
+  const chromePilot = mode === "chrome-pilot";
+  const development = mode === "development" || chromePilot;
   const apiUrl = process.env.VITE_OPENBOT_API_URL ?? PRODUCTION_API_URL;
   const webUrl = process.env.VITE_OPENBOT_WEB_URL ?? (process.env.VITE_OPENBOT_API_URL ? apiUrl : PRODUCTION_WEB_URL);
   return {
     base: "./",
     define: {
+      __OPENBOT_CHROME_PILOT__: JSON.stringify(chromePilot),
       "import.meta.env.VITE_OPENBOT_API_URL": JSON.stringify(apiUrl),
       "import.meta.env.VITE_OPENBOT_WEB_URL": JSON.stringify(webUrl),
       "import.meta.env.VITE_OPENBOT_ANALYTICS_URL": JSON.stringify(analyticsUrl(apiUrl, development)),
@@ -112,7 +117,7 @@ export default defineConfig(({ mode }) => {
     },
     resolve: { dedupe: ["solid-js", "@solidjs/web", "@solidjs/signals"] },
     build: {
-      outDir: "dist",
+      outDir: chromePilot ? "dist-chrome-pilot" : "dist",
       emptyOutDir: true,
       minify: !development,
       sourcemap: development,
@@ -132,8 +137,8 @@ export default defineConfig(({ mode }) => {
       lazyLanguageCatalogs(),
       tailwindcss(),
       solidPlugin(),
-      extensionManifest(apiUrl, webUrl, development),
-      xContentScript(development),
+      extensionManifest(apiUrl, webUrl, development, chromePilot),
+      ...(chromePilot ? [] : [xContentScript(development)]),
     ],
   };
 });

@@ -8,3 +8,4 @@ interface ImportMetaEnv {
 declare const __OPENBOT_X_NOTES__: boolean;
 
 declare var openbotRefs: Map<string, WeakRef<Element>> | undefined;
+declare const __OPENBOT_CHROME_PILOT__: boolean;
